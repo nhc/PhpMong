@@ -11,14 +11,10 @@ At the heart of this class is
 
 ### Usage
 
-#### Simple Docs
-
 The following code will search for an embedded collection and add a new item to the embedded collection.
 
     $product = new Product();
     $product->find(array('images.name'=>'juicy.jpg')); // search an embedded collection with dot notation
     $product->add->('images', array( 'name' => 'pear.jpg', 'server' => 'sd3' ) );
     $product->save();
-
-
 
