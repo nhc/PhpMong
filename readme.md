@@ -1,5 +1,7 @@
 ## phpmong
 
+THIS IS CURRENTLY WORK IN PROGRESS AND IS NOT READY FOR USE
+
 Simple wrapper for php mongo db. Most of the classes I found were overly complex. I only need to do a few really simple things. 
 
 At the heart of this class is
