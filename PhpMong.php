@@ -13,11 +13,15 @@ class PhpMong{
 	private $conn;
 	private $db;
 	private $dbname = 'test';
-	//public $props;
+	
+	private $update = false; // set with mongodb _id
+	
+	private $fieldNames = array();
 	
 	public function __construct($name)
 	{
 		$this->callername = $name;
+
 		
 		/*
 		* Connection 
@@ -29,6 +33,7 @@ class PhpMong{
 		*/
 		
 		$this->selectCollection();
+		$this->addDefaultFieldNames();
 	}
 	
 	private function conn()
@@ -42,42 +47,80 @@ class PhpMong{
 		$this->collection = $this->db->{$this->collection};
 	}
 	
+	public function addDefaultFieldNames()
+	{
+		foreach( $this->fieldnames() as $k => $v ):
+			$this->fieldNames[$k] = $v;
+		endforeach;
+		
+		$this->fieldNames['created_at'] = '';
+		$this->fieldNames['updated_at'] = '';
+	}
+	
+	public function mkSaveData()
+	{
+		if( is_array( $this->fieldNames ) ):
+				foreach( $this->fieldNames as $k => $v ):
+					if( isset( $this->{$k} ) ):
+						$arr[$k] = $this->{$k};
+					elseif( ( $k == 'created_at' ) or ( $k == 'updated_at' ) ):
+						$arr[$k] = new MongoDate();
+					endif;
+				endforeach;
+		endif;
+		
+	
+		return $arr;
+	}
+	
+	
 	/*
-	*	Saves attributes to the database
-	*	Checks allowed fieldnames first
+	*	Saves
 	*/
 	
 	public function save()
 	{
-		if( is_array( $this->fieldnames() ) ):
-			foreach( $this->fieldnames() as $k => $v ):
-				if( isset( $this->{$v} ) )
-					$arr[$v] = $this->{$v};
-			endforeach;
+		if( $this->update ):
+				$arr = $this->mkSaveData();
+				$new = array('$set' => $arr );
+				$this->collection->update(array( '_id'=> new MongoID($this->update)),$new);
+				$this->set(array('results'=>$arr));
+		else:
+			$arr = $this->mkSaveData();
+			$this->doSave($arr);
 		endif;
-		
-		$this->collection->insert($arr);
-		
 	}
 	
+	public function doSave($arr)
+	{
+		$this->collection->save($arr,array('safe'=>true));
+		if( isset($arr['_id']) ):
+			$this->setMongoID($arr);
+			$this->close();
+		endif;
+	}
+	
+	
+	private function setMongoID($arr)
+	{
+		$id = (array) $arr['_id'];
+		unset( $arr['_id'] );
+		$arr['_id'] = $id[key($id)];
+		$this->set(array('results'=>$arr));
+		$this->update = $arr['_id'];
+	}
 	/*
 	*	Return one document 
 	*/
 	
 	public function findOne($array)
 	{
-		$cursor = $this->collection->findOne($array);
-		$this->set(array('results'=>$cursor));
+		$arr = $this->collection->findOne($array);
+		$this->set(array('results'=>$arr));
+		$this->setMongoID($arr);
 		$this->close();
 	}
-	
-	/*
-	*	Embed an object withing another
-	*/
-	public function embedObject()
-	{
-		
-	}
+
 	
 	public function close()
 	{
@@ -93,19 +136,6 @@ class PhpMong{
 		endif;
 	}
 	
-	public function __set__($name, $value) 
-	{
-		if( is_array( $this->fieldnames() ) ):
-			foreach( $this->fieldnames() as $k => $v ):
-				if( $v == $name ) 
-					$this->{$name} = $value;
-				else 
-					echo("Can't add this property: " . $name . "<br />"); 
-			endforeach;
-		endif;
-    
-  }
-
 }	
 
 class Theproduct extends PhpMong
@@ -116,55 +146,21 @@ class Theproduct extends PhpMong
 		parent::__construct($className=__CLASS__);
 	}	
 	
+	/*
+	*	Defines our valid fields and their datatypes
+	* This is where we define embedded collections too
+	*/
+	
 	public function fieldnames()
 	{
 		return array(
-			'name', 'price', 'images'
-		);
-	}
-	
-	public function embeddedCollections()
-	{
-		return array(
-			'images' => 'Theimage'
+			'name' => 'text', 
+			'price' => 'text', 
+			'test' => 'text',
+			'images' => 'collection'
 		);
 	}
 	
 }
 
-class Theimage extends PhpMong
-{
-	public function __construct()
-	{
-		$this->set( array( "collection" => "images" ) );
-		parent::__construct($className=__CLASS__);
-	}	
-	
-	public function fieldnames()
-	{
-		return array(
-			'name', 'server'
-		);
-	}
-	
-	
-}
-
-
-	$m = new Theproduct();
-	$m->findOne(array('name'=>'hello neil'));
-	
-	$m->name = 'hello neil';
-	$m->images = array(
-		array( 'name' => 'title3.jpg', 'server' => 'sd3' ),
-		array( 'name' => 'title4.jpg', 'server' => 'dsev' )
-	);
-	$m->save();
-	
-	//print '<pre>';
-	print_r($m->results['name']);
-	
-	
-	//$m->find(array('name'=>'neil'));
-	
 ?>
